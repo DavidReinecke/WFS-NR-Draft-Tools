@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WFS Email Signature Generator</title>
+<style>
+  :root {
+    --wfs-dark: #1a1a1a;
+    --wfs-gray: #333333;
+    --wfs-teal: #467886;
+    --wfs-green: #2f5e2f;
+    --border: #d8dbdc;
+    --bg: #f5f6f7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    margin: 0;
+    padding: 0;
+    color: #1f1f1f;
+  }
+  header {
+    background: #1c2b1f;
+    color: #fff;
+    padding: 22px 24px;
+  }
+  header h1 {
+    margin: 0 0 4px 0;
+    font-size: 22px;
+  }
+  header p {
+    margin: 0;
+    font-size: 14px;
+    color: #c9d2c9;
+  }
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 28px 20px 60px;
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 28px;
+  }
+  @media (max-width: 820px) {
+    .wrap { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .card h2 {
+    font-size: 15px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #555;
+    margin: 0 0 16px 0;
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin: 14px 0 5px;
+    color: #333;
+  }
+  label .req { color: #b3261e; }
+  label .opt { color: #888; font-weight: 400; }
+  input[type=text], input[type=tel], input[type=email], select {
+    width: 100%;
+    padding: 9px 10px;
+    font-size: 14px;
+    border: 1px solid #c7cbcd;
+    border-radius: 6px;
+    background: #fff;
+    font-family: inherit;
+  }
+  input:focus, select:focus {
+    outline: 2px solid #2f5e2f;
+    outline-offset: 1px;
+    border-color: #2f5e2f;
+  }
+  .hint {
+    font-size: 12px;
+    color: #888;
+    margin-top: 4px;
+  }
+  .error-text {
+    font-size: 12px;
+    color: #b3261e;
+    margin-top: 4px;
+    display: none;
+  }
+  .field.invalid input, .field.invalid select {
+    border-color: #b3261e;
+  }
+  .field.invalid .error-text { display: block; }
+
+  .preview-area {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .preview-box {
+    background:
+      linear-gradient(45deg, #e9e9e9 25%, transparent 25%),
+      linear-gradient(-45deg, #e9e9e9 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #e9e9e9 75%),
+      linear-gradient(-45deg, transparent 75%, #e9e9e9 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    background-color: #fafafa;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow-x: auto;
+  }
+  #sigCanvas {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+  .actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  button {
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 11px 18px;
+    border-radius: 7px;
+    border: 1px solid transparent;
+    cursor: pointer;
+  }
+  #downloadBtn {
+    background: #2f5e2f;
+    color: #fff;
+  }
+  #downloadBtn:disabled {
+    background: #9fb39f;
+    cursor: not-allowed;
+  }
+  #copyBtn {
+    background: #fff;
+    color: #2f5e2f;
+    border-color: #2f5e2f;
+  }
+  #copyBtn:disabled {
+    color: #9fb39f;
+    border-color: #cfd9cf;
+    cursor: not-allowed;
+  }
+  .status {
+    font-size: 13px;
+    color: #567056;
+    min-height: 18px;
+  }
+  .note {
+    font-size: 12.5px;
+    color: #777;
+    line-height: 1.5;
+  }
+  footer {
+    text-align: center;
+    font-size: 12px;
+    color: #999;
+    padding: 20px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>U.S. Wildland Fire Service — Email Signature Generator</h1>
+  <p>Fill in your details to generate your standard email signature block as a PNG.</p>
+</header>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>Your Information</h2>
+    <form id="sigForm" novalidate>
+
+      <div class="field" id="field-region">
+        <label for="region">Geographic Area <span class="req">*</span></label>
+        <select id="region" required>
+          <option value="" disabled selected>Select your Geographic Area</option>
+          <option>Alaska</option>
+          <option>Eastern Area</option>
+          <option>Great Basin</option>
+          <option>Northern California</option>
+          <option>Northern Rockies</option>
+          <option>Northwest</option>
+          <option>Rocky Mountain</option>
+          <option>Southern Area</option>
+          <option>Southern California</option>
+          <option>Southwest</option>
+        </select>
+        <div class="error-text">Please select your Geographic Area.</div>
+      </div>
+
+      <div class="field" id="field-name">
+        <label for="fullName">Full Name <span class="req">*</span></label>
+        <input type="text" id="fullName" placeholder="e.g. David Reinecke" required>
+        <div class="error-text">Please enter your full name.</div>
+      </div>
+
+      <div class="field" id="field-title">
+        <label for="jobTitle">Job Title / Position <span class="req">*</span></label>
+        <input type="text" id="jobTitle" placeholder="e.g. Executive Staff Assistant" required>
+        <div class="error-text">Please enter your job title.</div>
+      </div>
+
+      <div class="field" id="field-duty">
+        <label for="dutyStation">Duty Station <span class="req">*</span></label>
+        <input type="text" id="dutyStation" placeholder="e.g. Billings, Montana" required>
+        <div class="error-text">Please enter your duty station.</div>
+      </div>
+
+      <div class="field" id="field-phone">
+        <label for="phone">Phone Number <span class="req">*</span></label>
+        <input type="tel" id="phone" placeholder="e.g. (406) 850-1019" required>
+        <div class="error-text">Please enter your phone number.</div>
+      </div>
+
+      <div class="field" id="field-agency">
+        <label for="agencyEmail">Agency Email <span class="req">*</span></label>
+        <input type="email" id="agencyEmail" placeholder="e.g. dreinecke@blm.gov" required>
+        <div class="error-text">Please enter a valid agency email.</div>
+      </div>
+
+      <div class="field" id="field-firenet">
+        <label for="firenetEmail">FireNet Email <span class="opt">(optional)</span></label>
+        <input type="email" id="firenetEmail" placeholder="e.g. david_reinecke@firenet.gov">
+        <div class="error-text">Please enter a valid email address.</div>
+      </div>
+
+    </form>
+  </div>
+
+  <div class="preview-area">
+    <div class="card">
+      <h2>Live Preview</h2>
+      <div class="preview-box">
+        <canvas id="sigCanvas" width="1713" height="363"></canvas>
+      </div>
+      <div class="actions" style="margin-top:16px;">
+        <button id="downloadBtn" disabled>Download PNG</button>
+        <button id="copyBtn" disabled>Copy Image</button>
+      </div>
+      <div class="status" id="status"></div>
+      <p class="note" style="margin-top:10px;">
+        The background is transparent — it will look correct in email clients regardless of your inbox theme.
+        Fill in all required fields to enable download.
+      </p>
+    </div>
+  </div>
+
+</div>
+
+<footer>U.S. Wildland Fire Service — Northern Rockies Geographic Area</footer>
+
+<script>
+const canvas = document.getElementById('sigCanvas');
+const ctx = canvas.getContext('2d');
+
+const logo = new Image();
+logo.src = 'assets/logo.png';
+let logoLoaded = false;
+logo.onload = () => { logoLoaded = true; render(); };
+
+const fields = {
+  region: document.getElementById('region'),
+  fullName: document.getElementById('fullName'),
+  jobTitle: document.getElementById('jobTitle'),
+  dutyStation: document.getElementById('dutyStation'),
+  phone: document.getElementById('phone'),
+  agencyEmail: document.getElementById('agencyEmail'),
+  firenetEmail: document.getElementById('firenetEmail'),
+};
+
+const downloadBtn = document.getElementById('downloadBtn');
+const copyBtn = document.getElementById('copyBtn');
+const statusEl = document.getElementById('status');
+
+function emailValid(v) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
+
+function validate() {
+  let ok = true;
+
+  const checks = [
+    ['region', fields.region.value.trim() !== ''],
+    ['name', fields.fullName.value.trim() !== ''],
+    ['title', fields.jobTitle.value.trim() !== ''],
+    ['duty', fields.dutyStation.value.trim() !== ''],
+    ['phone', fields.phone.value.trim() !== ''],
+    ['agency', emailValid(fields.agencyEmail.value.trim())],
+  ];
+
+  checks.forEach(([key, valid]) => {
+    const el = document.getElementById('field-' + key);
+    if (!el) return;
+    // Only show red state after user has interacted (has value) and it's wrong,
+    // never block silently — but for enabling the button we need strict validity.
+    if (!valid) ok = false;
+  });
+
+  const firenetVal = fields.firenetEmail.value.trim();
+  const firenetOk = firenetVal === '' || emailValid(firenetVal);
+  if (!firenetOk) ok = false;
+
+  downloadBtn.disabled = !ok;
+  copyBtn.disabled = !ok;
+  return ok;
+}
+
+function drawTextSegments(segments, x, y) {
+  // segments: [{text, font, color, underline}]
+  let cursorX = x;
+  segments.forEach(seg => {
+    ctx.font = seg.font;
+    ctx.fillStyle = seg.color;
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(seg.text, cursorX, y);
+    const width = ctx.measureText(seg.text).width;
+    if (seg.underline) {
+      ctx.strokeStyle = seg.color;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cursorX, y + 4);
+      ctx.lineTo(cursorX + width, y + 4);
+      ctx.stroke();
+    }
+    cursorX += width;
+  });
+  return cursorX;
+}
+
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Logo
+  if (logoLoaded) {
+    const targetH = 340;
+    const scale = targetH / logo.height;
+    const targetW = logo.width * scale;
+    const zoneW = 390;
+    const xOff = (zoneW - targetW) / 2;
+    const yOff = (canvas.height - targetH) / 2;
+    ctx.drawImage(logo, xOff, yOff, targetW, targetH);
+  }
+
+  const textX = 408;
+  const darkColor = '#1a1a1a';
+  const grayColor = '#333333';
+  const tealColor = '#467886';
+
+  const name = fields.fullName.value.trim() || 'Full Name';
+  const region = fields.region.value || 'Geographic Area';
+  const title = fields.jobTitle.value.trim() || 'Job Title';
+  const duty = fields.dutyStation.value.trim() || 'Duty Station';
+  const phone = fields.phone.value.trim() || 'Phone Number';
+  const agencyEmail = fields.agencyEmail.value.trim() || 'agency@email.gov';
+  const firenetEmail = fields.firenetEmail.value.trim();
+
+  // Name
+  ctx.fillStyle = darkColor;
+  ctx.font = 'bold 46px Arial, Helvetica, sans-serif';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(name, textX, 64);
+
+  // Subtitle
+  ctx.font = 'italic bold 34px Arial, Helvetica, sans-serif';
+  ctx.fillText('U.S. Wildland Fire Service – ' + region, textX, 133);
+
+  // Title
+  ctx.font = '28px Arial, Helvetica, sans-serif';
+  ctx.fillText(title, textX, 185);
+
+  // Divider
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(405, 212, 1648 - 405, 5);
+
+  // Duty station
+  ctx.fillStyle = grayColor;
+  ctx.font = '27px Arial, Helvetica, sans-serif';
+  ctx.fillText('Duty Station:  ' + duty, textX, 272);
+
+  // Contact line
+  const contactFont = '27px Arial, Helvetica, sans-serif';
+  let segs = [
+    { text: phone + '  |  ', font: contactFont, color: grayColor, underline: false },
+    { text: agencyEmail, font: contactFont, color: tealColor, underline: true },
+  ];
+  if (firenetEmail) {
+    segs.push({ text: '   |   ', font: contactFont, color: grayColor, underline: false });
+    segs.push({ text: firenetEmail, font: contactFont, color: tealColor, underline: true });
+  }
+  drawTextSegments(segs, textX, 321);
+
+  validate();
+}
+
+Object.values(fields).forEach(el => {
+  el.addEventListener('input', render);
+  el.addEventListener('change', render);
+});
+
+downloadBtn.addEventListener('click', () => {
+  if (!validate()) return;
+  const link = document.createElement('a');
+  const safeName = (fields.fullName.value.trim() || 'signature').replace(/[^a-z0-9]+/gi, '_');
+  link.download = 'WFS_Signature_' + safeName + '.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+  statusEl.textContent = 'Downloaded.';
+});
+
+copyBtn.addEventListener('click', async () => {
+  if (!validate()) return;
+  try {
+    canvas.toBlob(async (blob) => {
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob })
+      ]);
+      statusEl.textContent = 'Copied to clipboard.';
+    });
+  } catch (err) {
+    statusEl.textContent = 'Copy not supported in this browser — use Download instead.';
+  }
+});
+
+render();
+</script>
+
+</body>
+</html>
