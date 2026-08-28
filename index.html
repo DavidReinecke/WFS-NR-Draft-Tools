@@ -201,26 +201,26 @@
 
       <div class="field" id="field-name">
         <label for="fullName">Full Name <span class="req">*</span></label>
-        <input type="text" id="fullName" placeholder="e.g. David Reinecke" required>
+        <input type="text" id="fullName" placeholder="e.g. David Reinecke" spellcheck="true" required>
         <div class="error-text">Please enter your full name.</div>
       </div>
 
       <div class="field" id="field-title">
         <label for="jobTitle">Job Title / Position <span class="req">*</span></label>
-        <input type="text" id="jobTitle" placeholder="e.g. Executive Staff Assistant" required>
+        <input type="text" id="jobTitle" placeholder="e.g. Executive Staff Assistant" spellcheck="true" required>
         <div class="error-text">Please enter your job title.</div>
       </div>
 
       <div class="field" id="field-duty">
         <label for="dutyStation">Duty Station <span class="req">*</span></label>
-        <input type="text" id="dutyStation" placeholder="e.g. Billings, Montana" required>
+        <input type="text" id="dutyStation" placeholder="e.g. Billings, Montana" spellcheck="true" required>
         <div class="error-text">Please enter your duty station.</div>
       </div>
 
       <div class="field" id="field-phone">
         <label for="phone">Phone Number <span class="req">*</span></label>
-        <input type="tel" id="phone" placeholder="e.g. (406) 850-1019" required>
-        <div class="error-text">Please enter your phone number.</div>
+        <input type="tel" id="phone" placeholder="(406) 850-1019" maxlength="14" inputmode="numeric" required>
+        <div class="error-text">Please enter a 10-digit phone number.</div>
       </div>
 
       <div class="field" id="field-agency">
@@ -286,6 +286,29 @@ function emailValid(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 }
 
+function formatPhoneDigits(digits) {
+  // digits: string of up to 10 raw digits
+  if (digits.length === 0) return '';
+  if (digits.length < 4) return `(${digits}`;
+  if (digits.length < 7) return `(${digits.slice(0,3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6,10)}`;
+}
+
+function phoneValid(v) {
+  return /^\(\d{3}\) \d{3}-\d{4}$/.test(v.trim());
+}
+
+function handlePhoneInput() {
+  const raw = fields.phone.value;
+  const digits = raw.replace(/\D/g, '').slice(0, 10);
+  const cursorAtEnd = fields.phone.selectionEnd === raw.length;
+  fields.phone.value = formatPhoneDigits(digits);
+  if (cursorAtEnd) {
+    fields.phone.selectionStart = fields.phone.selectionEnd = fields.phone.value.length;
+  }
+  render();
+}
+
 function validate() {
   let ok = true;
 
@@ -294,7 +317,7 @@ function validate() {
     ['name', fields.fullName.value.trim() !== ''],
     ['title', fields.jobTitle.value.trim() !== ''],
     ['duty', fields.dutyStation.value.trim() !== ''],
-    ['phone', fields.phone.value.trim() !== ''],
+    ['phone', phoneValid(fields.phone.value)],
     ['agency', emailValid(fields.agencyEmail.value.trim())],
   ];
 
@@ -433,10 +456,14 @@ function render() {
   validate();
 }
 
-Object.values(fields).forEach(el => {
+Object.entries(fields).forEach(([key, el]) => {
+  if (key === 'phone') return; // phone gets its own formatting handler below
   el.addEventListener('input', render);
   el.addEventListener('change', render);
 });
+
+fields.phone.addEventListener('input', handlePhoneInput);
+fields.phone.addEventListener('change', handlePhoneInput);
 
 downloadBtn.addEventListener('click', () => {
   if (!validate()) return;
