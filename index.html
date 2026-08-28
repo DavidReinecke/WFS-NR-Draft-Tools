@@ -323,6 +323,18 @@ function validate() {
   return ok;
 }
 
+const MAX_TEXT_X = 1648; // right edge of the divider / text safe zone
+
+function fitFontSize(text, fontBuilder, baseSize, maxWidth, minSize) {
+  let size = baseSize;
+  while (size > minSize) {
+    ctx.font = fontBuilder(size);
+    if (ctx.measureText(text).width <= maxWidth) break;
+    size -= 1;
+  }
+  return size;
+}
+
 function drawTextSegments(segments, x, y) {
   // segments: [{text, font, color, underline}]
   let cursorX = x;
@@ -372,18 +384,27 @@ function render() {
   const agencyEmail = fields.agencyEmail.value.trim() || 'agency@email.gov';
   const firenetEmail = fields.firenetEmail.value.trim();
 
+  const maxWidth = MAX_TEXT_X - textX;
+
   // Name
   ctx.fillStyle = darkColor;
-  ctx.font = 'bold 46px Arial, Helvetica, sans-serif';
+  const nameFontOf = (s) => `bold ${s}px Arial, Helvetica, sans-serif`;
+  const nameSize = fitFontSize(name, nameFontOf, 56, maxWidth, 24);
+  ctx.font = nameFontOf(nameSize);
   ctx.textBaseline = 'alphabetic';
   ctx.fillText(name, textX, 64);
 
   // Subtitle
-  ctx.font = 'italic bold 34px Arial, Helvetica, sans-serif';
-  ctx.fillText('U.S. Wildland Fire Service – ' + region, textX, 133);
+  const subtitleText = 'U.S. Wildland Fire Service – ' + region;
+  const subtitleFontOf = (s) => `italic bold ${s}px Arial, Helvetica, sans-serif`;
+  const subtitleSize = fitFontSize(subtitleText, subtitleFontOf, 50, maxWidth, 20);
+  ctx.font = subtitleFontOf(subtitleSize);
+  ctx.fillText(subtitleText, textX, 133);
 
   // Title
-  ctx.font = '28px Arial, Helvetica, sans-serif';
+  const titleFontOf = (s) => `${s}px Arial, Helvetica, sans-serif`;
+  const titleSize = fitFontSize(title, titleFontOf, 44, maxWidth, 18);
+  ctx.font = titleFontOf(titleSize);
   ctx.fillText(title, textX, 185);
 
   // Divider
@@ -392,11 +413,19 @@ function render() {
 
   // Duty station
   ctx.fillStyle = grayColor;
-  ctx.font = '27px Arial, Helvetica, sans-serif';
-  ctx.fillText('Duty Station:  ' + duty, textX, 272);
+  const dutyText = 'Duty Station:  ' + duty;
+  const dutyFontOf = (s) => `${s}px Arial, Helvetica, sans-serif`;
+  const dutySize = fitFontSize(dutyText, dutyFontOf, 44, maxWidth, 18);
+  ctx.font = dutyFontOf(dutySize);
+  ctx.fillText(dutyText, textX, 272);
 
-  // Contact line
-  const contactFont = '27px Arial, Helvetica, sans-serif';
+  // Contact line — size once against the full combined string, then draw as colored segments
+  const contactFontOf = (s) => `${s}px Arial, Helvetica, sans-serif`;
+  let fullContact = phone + '  |  ' + agencyEmail;
+  if (firenetEmail) fullContact += '   |   ' + firenetEmail;
+  const contactSize = fitFontSize(fullContact, contactFontOf, 44, maxWidth, 16);
+  const contactFont = contactFontOf(contactSize);
+
   let segs = [
     { text: phone + '  |  ', font: contactFont, color: grayColor, underline: false },
     { text: agencyEmail, font: contactFont, color: tealColor, underline: true },
