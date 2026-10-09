@@ -258,7 +258,7 @@
     <div class="card">
       <h2>Live Preview</h2>
       <div class="preview-box">
-        <canvas id="sigCanvas" width="1300" height="400"></canvas>
+        <canvas id="sigCanvas" width="700" height="260"></canvas>
       </div>
       <div class="actions" style="margin-top:16px;">
         <button id="downloadBtn" disabled>Download PNG</button>
@@ -401,29 +401,21 @@ function drawTextSegments(segments, x, y) {
   return cursorX;
 }
 
-const LINE_PITCH = 42;
-const TEXT_START_Y = 58;
-const LOGO_ZONE_W = 275;
-const TEXT_X = LOGO_ZONE_W + 30;
-const RIGHT_MARGIN = 40;
+// The canvas is sized dynamically to hug the actual content (see render()),
+// matching the reference design where the logo's height exactly matches the
+// full text block's height, flush top-to-bottom — rather than a fixed,
+// oversized frame that leaves the text looking small in a sea of whitespace.
+const PADDING = 26;          // top/bottom/left padding around the whole block
+const NAME_SIZE = 29;        // bold name font size (px)
+const BODY_SIZE = 23;        // regular line font size (px)
+const LINE_PITCH = 32;       // vertical distance between line baselines
+const GAP_LOGO_TEXT = 26;    // gap between logo's right edge and text column
+const RIGHT_MARGIN = 28;
+const MAX_TEXT_WIDTH = 760;  // cap text column width before shrinking fonts
+const MIN_BODY_SIZE = 14;
+const MIN_NAME_SIZE = 17;
 
 function render() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Logo — sized FROM the zone width (not independently), so it can never be
-  // wider than its zone and get clipped. Padding is fixed; height follows the
-  // logo's own aspect ratio. Vertically centered on the canvas.
-  if (logoLoaded) {
-    const zonePadding = 20; // 10px breathing room on each side
-    const targetW = LOGO_ZONE_W - zonePadding;
-    const targetH = targetW * (logo.height / logo.width);
-    const xOff = zonePadding / 2;
-    const yOff = (canvas.height - targetH) / 2;
-    ctx.drawImage(logo, xOff, yOff, targetW, targetH);
-  }
-
   const blackColor = '#000000';
   const tealColor = '#467886';
   const regularFont = 'Calibri, "Segoe UI", Arial, Helvetica, sans-serif';
@@ -439,36 +431,6 @@ function render() {
   const agencyEmail = fields.agencyEmail.value.trim() || 'agency@email.gov';
   const firenetEmail = fields.firenetEmail.value.trim();
 
-  const maxWidth = canvas.width - TEXT_X - RIGHT_MARGIN;
-  ctx.textBaseline = 'alphabetic';
-
-  let y = TEXT_START_Y;
-
-  // Name (bold, larger)
-  ctx.fillStyle = blackColor;
-  const nameFontOf = (s) => `bold ${s}px ${regularFont}`;
-  const nameSize = fitFontSize(name, nameFontOf, 32, maxWidth, 18);
-  ctx.font = nameFontOf(nameSize);
-  ctx.fillText(name, TEXT_X, y);
-  y += LINE_PITCH;
-
-  // Simple plain text lines, drawn in sequence
-  const plainFontOf = (s) => `${s}px ${regularFont}`;
-  function drawPlainLine(text) {
-    const size = fitFontSize(text, plainFontOf, 26, maxWidth, 15);
-    ctx.font = plainFontOf(size);
-    ctx.fillStyle = blackColor;
-    ctx.fillText(text, TEXT_X, y);
-    y += LINE_PITCH;
-  }
-
-  drawPlainLine(title);
-  drawPlainLine('U.S. Wildland Fire Service');
-  drawPlainLine(region);
-  drawPlainLine('U.S. Department of the Interior');
-
-  // Office / Mobile phone line — either or both may be present (at least
-  // one is required by validate(), but render() stays defensive regardless)
   let phoneLine;
   if (officePhone && mobilePhone) {
     phoneLine = 'Office: ' + officePhone + '  |  Mobile: ' + mobilePhone;
@@ -479,25 +441,76 @@ function render() {
   } else {
     phoneLine = 'Office: Office Phone';
   }
-  drawPlainLine(phoneLine);
 
-  // Email line(s) — label in black, address in teal + underlined
-  function drawEmailLine(label, email) {
-    const fullText = label + ' ' + email;
-    const size = fitFontSize(fullText, plainFontOf, 26, maxWidth, 15);
-    const font = plainFontOf(size);
-    const segs = [
-      { text: label + ' ', font, color: blackColor, underline: false },
-      { text: email, font, color: tealColor, underline: true },
-    ];
-    drawTextSegments(segs, TEXT_X, y);
-    y += LINE_PITCH;
-  }
+  const nameFontOf = (s) => `bold ${s}px ${regularFont}`;
+  const plainFontOf = (s) => `${s}px ${regularFont}`;
 
-  drawEmailLine('Email:', agencyEmail);
+  // Each line, in drawing order, with its own font builder/base size.
+  const lines = [
+    { text: name, fontOf: nameFontOf, base: NAME_SIZE, min: MIN_NAME_SIZE, bold: true },
+    { text: title, fontOf: plainFontOf, base: BODY_SIZE, min: MIN_BODY_SIZE },
+    { text: 'U.S. Wildland Fire Service', fontOf: plainFontOf, base: BODY_SIZE, min: MIN_BODY_SIZE },
+    { text: region, fontOf: plainFontOf, base: BODY_SIZE, min: MIN_BODY_SIZE },
+    { text: 'U.S. Department of the Interior', fontOf: plainFontOf, base: BODY_SIZE, min: MIN_BODY_SIZE },
+    { text: phoneLine, fontOf: plainFontOf, base: BODY_SIZE, min: MIN_BODY_SIZE },
+    { text: 'Email: ' + agencyEmail, fontOf: plainFontOf, base: BODY_SIZE, min: MIN_BODY_SIZE },
+  ];
   if (firenetEmail) {
-    drawEmailLine('FireNet:', firenetEmail);
+    lines.push({ text: 'FireNet: ' + firenetEmail, fontOf: plainFontOf, base: BODY_SIZE, min: MIN_BODY_SIZE });
   }
+
+  // Measure each line at its target size (shrinking only if it would blow
+  // past MAX_TEXT_WIDTH) to find how wide the text column actually needs to be.
+  let maxLineWidth = 0;
+  lines.forEach(line => {
+    line.size = fitFontSize(line.text, line.fontOf, line.base, MAX_TEXT_WIDTH, line.min);
+    ctx.font = line.fontOf(line.size);
+    line.width = ctx.measureText(line.text).width;
+    if (line.width > maxLineWidth) maxLineWidth = line.width;
+  });
+
+  // Text block height: one LINE_PITCH box per line.
+  const textBlockHeight = lines.length * LINE_PITCH;
+
+  // Logo sized so its displayed height matches the text block height exactly,
+  // flush with the text block's top and bottom (matches the reference image).
+  const logoAspect = logoLoaded ? (logo.width / logo.height) : 0.85;
+  const logoHeight = textBlockHeight;
+  const logoWidth = logoHeight * logoAspect;
+
+  const textX = PADDING + logoWidth + GAP_LOGO_TEXT;
+  canvas.width = Math.round(textX + maxLineWidth + RIGHT_MARGIN);
+  canvas.height = Math.round(textBlockHeight + PADDING * 2);
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (logoLoaded) {
+    ctx.drawImage(logo, PADDING, PADDING, logoWidth, logoHeight);
+  }
+
+  ctx.textBaseline = 'alphabetic';
+  let y = PADDING + Math.round(LINE_PITCH * 0.75);
+
+  lines.forEach(line => {
+    ctx.font = line.fontOf(line.size);
+    ctx.fillStyle = blackColor;
+
+    if (line.text.indexOf('Email: ') === 0 || line.text.indexOf('FireNet: ') === 0) {
+      const spaceIdx = line.text.indexOf(' ');
+      const label = line.text.slice(0, spaceIdx + 1);
+      const email = line.text.slice(spaceIdx + 1);
+      const segs = [
+        { text: label, font: line.fontOf(line.size), color: blackColor, underline: false },
+        { text: email, font: line.fontOf(line.size), color: tealColor, underline: true },
+      ];
+      drawTextSegments(segs, textX, y);
+    } else {
+      ctx.fillText(line.text, textX, y);
+    }
+    y += LINE_PITCH;
+  });
 
   validate();
 }

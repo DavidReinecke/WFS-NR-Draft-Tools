@@ -56,14 +56,19 @@ self-contained in the repo.
 - **Geographic Areas list**: edit the `<select id="region">` options in
   `index.html`.
 - **Static lines** ("U.S. Wildland Fire Service," "U.S. Department of the
-  Interior"): hardcoded as plain strings inside `render()` in `index.html`
-  — search for `drawPlainLine`.
-- **Colors/fonts/line spacing**: `LINE_PITCH`, `TEXT_START_Y`, `LOGO_ZONE_W`
-  (which the logo and `TEXT_X` are both derived from), and the font sizes
-  passed to `fitFontSize` near the top of `render()` in `index.html`. The
-  logo's displayed size is always derived from `LOGO_ZONE_W` using its own
-  aspect ratio — never set independently — so it can't be sized wider than
-  its zone and get clipped at the canvas edge.
+  Interior"): hardcoded as plain strings in the `lines` array built inside
+  `render()` in `index.html`.
+- **Colors/fonts/line spacing**: `NAME_SIZE`, `BODY_SIZE`, `LINE_PITCH`,
+  `PADDING`, `GAP_LOGO_TEXT`, and `RIGHT_MARGIN`, defined just above
+  `render()` in `index.html`. The canvas is sized dynamically every render —
+  not a fixed frame — to hug the actual content: its height is driven by the
+  number of lines × `LINE_PITCH`, and its width by the widest rendered line
+  (measured with `ctx.measureText`) plus margins. The logo's displayed height
+  always matches the full text block's height exactly, flush top-to-bottom
+  with the text, and its width follows from its own aspect ratio — so it can
+  never be clipped or look mismatched in scale. Very long names/titles/emails
+  shrink (via `fitFontSize`, capped by `MAX_TEXT_WIDTH`) rather than growing
+  the canvas without bound.
 
 ## Browser support
 
