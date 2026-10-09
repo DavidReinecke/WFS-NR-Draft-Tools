@@ -227,14 +227,15 @@
       </div>
 
       <div class="field" id="field-office-phone">
-        <label for="officePhone">Office Phone <span class="req">*</span></label>
-        <input type="tel" id="officePhone" placeholder="(406) 850-1019" maxlength="14" inputmode="numeric" required>
+        <label for="officePhone">Office Phone</label>
+        <input type="tel" id="officePhone" placeholder="(406) 850-1019" maxlength="14" inputmode="numeric">
         <div class="error-text">Please enter a 10-digit phone number.</div>
       </div>
 
       <div class="field" id="field-mobile-phone">
-        <label for="mobilePhone">Mobile Phone <span class="opt">(optional)</span></label>
+        <label for="mobilePhone">Mobile Phone</label>
         <input type="tel" id="mobilePhone" placeholder="(406) 850-1019" maxlength="14" inputmode="numeric">
+        <div class="hint">At least one of Office or Mobile phone is required. <span class="req">*</span></div>
         <div class="error-text">Please enter a 10-digit phone number.</div>
       </div>
 
@@ -257,7 +258,7 @@
     <div class="card">
       <h2>Live Preview</h2>
       <div class="preview-box">
-        <canvas id="sigCanvas" width="1000" height="360"></canvas>
+        <canvas id="sigCanvas" width="1300" height="400"></canvas>
       </div>
       <div class="actions" style="margin-top:16px;">
         <button id="downloadBtn" disabled>Download PNG</button>
@@ -331,7 +332,6 @@ function validate() {
     ['region', fields.region.value.trim() !== ''],
     ['name', fields.fullName.value.trim() !== ''],
     ['title', fields.jobTitle.value.trim() !== ''],
-    ['office-phone', phoneValid(fields.officePhone.value)],
     ['agency', emailValid(fields.agencyEmail.value.trim())],
   ];
 
@@ -343,9 +343,22 @@ function validate() {
     if (!valid) ok = false;
   });
 
+  // Office and Mobile are each optional individually, but at least one
+  // well-formatted number is required between the two.
+  const officeVal = fields.officePhone.value.trim();
   const mobileVal = fields.mobilePhone.value.trim();
-  const mobileOk = mobileVal === '' || phoneValid(mobileVal);
-  if (!mobileOk) ok = false;
+  const officeFormatOk = officeVal === '' || phoneValid(officeVal);
+  const mobileFormatOk = mobileVal === '' || phoneValid(mobileVal);
+  const atLeastOnePhone = phoneValid(officeVal) || phoneValid(mobileVal);
+  const phoneOk = officeFormatOk && mobileFormatOk && atLeastOnePhone;
+  if (!phoneOk) ok = false;
+
+  // Only flag an individual phone field red for a format error, never merely
+  // for being the empty one when the other phone is already valid.
+  const officeEl = document.getElementById('field-office-phone');
+  if (officeEl) officeEl.classList.toggle('invalid', officeVal !== '' && !officeFormatOk);
+  const mobileEl = document.getElementById('field-mobile-phone');
+  if (mobileEl) mobileEl.classList.toggle('invalid', mobileVal !== '' && !mobileFormatOk);
 
   const firenetVal = fields.firenetEmail.value.trim();
   const firenetOk = firenetVal === '' || emailValid(firenetVal);
@@ -388,23 +401,25 @@ function drawTextSegments(segments, x, y) {
   return cursorX;
 }
 
-const LINE_PITCH = 34;
-const TEXT_START_Y = 54;
-const TEXT_X = 230;
-const RIGHT_MARGIN = 30;
+const LINE_PITCH = 42;
+const TEXT_START_Y = 58;
+const LOGO_ZONE_W = 275;
+const TEXT_X = LOGO_ZONE_W + 30;
+const RIGHT_MARGIN = 40;
 
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Logo — fixed height, vertically centered, independent of how many text lines are present
+  // Logo — sized FROM the zone width (not independently), so it can never be
+  // wider than its zone and get clipped. Padding is fixed; height follows the
+  // logo's own aspect ratio. Vertically centered on the canvas.
   if (logoLoaded) {
-    const targetH = 280;
-    const scale = targetH / logo.height;
-    const targetW = logo.width * scale;
-    const zoneW = 210;
-    const xOff = (zoneW - targetW) / 2;
+    const zonePadding = 20; // 10px breathing room on each side
+    const targetW = LOGO_ZONE_W - zonePadding;
+    const targetH = targetW * (logo.height / logo.width);
+    const xOff = zonePadding / 2;
     const yOff = (canvas.height - targetH) / 2;
     ctx.drawImage(logo, xOff, yOff, targetW, targetH);
   }
@@ -414,9 +429,12 @@ function render() {
   const regularFont = 'Calibri, "Segoe UI", Arial, Helvetica, sans-serif';
 
   const name = fields.fullName.value.trim() || 'Full Name';
-  const region = fields.region.value || 'Geographic Area';
+  const regionRaw = fields.region.value;
+  const region = regionRaw
+    ? (regionRaw.endsWith('Area') ? regionRaw : regionRaw + ' Geographic Area')
+    : 'Geographic Area';
   const title = fields.jobTitle.value.trim() || 'Job Title';
-  const officePhone = fields.officePhone.value.trim() || 'Office Phone';
+  const officePhone = fields.officePhone.value.trim();
   const mobilePhone = fields.mobilePhone.value.trim();
   const agencyEmail = fields.agencyEmail.value.trim() || 'agency@email.gov';
   const firenetEmail = fields.firenetEmail.value.trim();
@@ -429,7 +447,7 @@ function render() {
   // Name (bold, larger)
   ctx.fillStyle = blackColor;
   const nameFontOf = (s) => `bold ${s}px ${regularFont}`;
-  const nameSize = fitFontSize(name, nameFontOf, 26, maxWidth, 14);
+  const nameSize = fitFontSize(name, nameFontOf, 32, maxWidth, 18);
   ctx.font = nameFontOf(nameSize);
   ctx.fillText(name, TEXT_X, y);
   y += LINE_PITCH;
@@ -437,7 +455,7 @@ function render() {
   // Simple plain text lines, drawn in sequence
   const plainFontOf = (s) => `${s}px ${regularFont}`;
   function drawPlainLine(text) {
-    const size = fitFontSize(text, plainFontOf, 20, maxWidth, 12);
+    const size = fitFontSize(text, plainFontOf, 26, maxWidth, 15);
     ctx.font = plainFontOf(size);
     ctx.fillStyle = blackColor;
     ctx.fillText(text, TEXT_X, y);
@@ -449,15 +467,24 @@ function render() {
   drawPlainLine(region);
   drawPlainLine('U.S. Department of the Interior');
 
-  // Office / Mobile phone line
-  let phoneLine = 'Office: ' + officePhone;
-  if (mobilePhone) phoneLine += '  |  Mobile: ' + mobilePhone;
+  // Office / Mobile phone line — either or both may be present (at least
+  // one is required by validate(), but render() stays defensive regardless)
+  let phoneLine;
+  if (officePhone && mobilePhone) {
+    phoneLine = 'Office: ' + officePhone + '  |  Mobile: ' + mobilePhone;
+  } else if (officePhone) {
+    phoneLine = 'Office: ' + officePhone;
+  } else if (mobilePhone) {
+    phoneLine = 'Mobile: ' + mobilePhone;
+  } else {
+    phoneLine = 'Office: Office Phone';
+  }
   drawPlainLine(phoneLine);
 
   // Email line(s) — label in black, address in teal + underlined
   function drawEmailLine(label, email) {
     const fullText = label + ' ' + email;
-    const size = fitFontSize(fullText, plainFontOf, 20, maxWidth, 12);
+    const size = fitFontSize(fullText, plainFontOf, 26, maxWidth, 15);
     const font = plainFontOf(size);
     const segs = [
       { text: label + ' ', font, color: blackColor, underline: false },
