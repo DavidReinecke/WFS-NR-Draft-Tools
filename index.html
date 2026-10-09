@@ -226,15 +226,15 @@
         <div class="error-text">Please enter your job title.</div>
       </div>
 
-      <div class="field" id="field-duty">
-        <label for="dutyStation">Duty Station <span class="req">*</span></label>
-        <input type="text" id="dutyStation" placeholder="e.g. Billings, Montana" spellcheck="true" required>
-        <div class="error-text">Please enter your duty station.</div>
+      <div class="field" id="field-office-phone">
+        <label for="officePhone">Office Phone <span class="req">*</span></label>
+        <input type="tel" id="officePhone" placeholder="(406) 850-1019" maxlength="14" inputmode="numeric" required>
+        <div class="error-text">Please enter a 10-digit phone number.</div>
       </div>
 
-      <div class="field" id="field-phone">
-        <label for="phone">Phone Number <span class="req">*</span></label>
-        <input type="tel" id="phone" placeholder="(406) 850-1019" maxlength="14" inputmode="numeric" required>
+      <div class="field" id="field-mobile-phone">
+        <label for="mobilePhone">Mobile Phone <span class="opt">(optional)</span></label>
+        <input type="tel" id="mobilePhone" placeholder="(406) 850-1019" maxlength="14" inputmode="numeric">
         <div class="error-text">Please enter a 10-digit phone number.</div>
       </div>
 
@@ -257,7 +257,7 @@
     <div class="card">
       <h2>Live Preview</h2>
       <div class="preview-box">
-        <canvas id="sigCanvas" width="1713" height="363"></canvas>
+        <canvas id="sigCanvas" width="1000" height="360"></canvas>
       </div>
       <div class="actions" style="margin-top:16px;">
         <button id="downloadBtn" disabled>Download PNG</button>
@@ -287,8 +287,8 @@ const fields = {
   region: document.getElementById('region'),
   fullName: document.getElementById('fullName'),
   jobTitle: document.getElementById('jobTitle'),
-  dutyStation: document.getElementById('dutyStation'),
-  phone: document.getElementById('phone'),
+  officePhone: document.getElementById('officePhone'),
+  mobilePhone: document.getElementById('mobilePhone'),
   agencyEmail: document.getElementById('agencyEmail'),
   firenetEmail: document.getElementById('firenetEmail'),
 };
@@ -313,13 +313,13 @@ function phoneValid(v) {
   return /^\(\d{3}\) \d{3}-\d{4}$/.test(v.trim());
 }
 
-function handlePhoneInput() {
-  const raw = fields.phone.value;
+function handlePhoneInput(inputEl) {
+  const raw = inputEl.value;
   const digits = raw.replace(/\D/g, '').slice(0, 10);
-  const cursorAtEnd = fields.phone.selectionEnd === raw.length;
-  fields.phone.value = formatPhoneDigits(digits);
+  const cursorAtEnd = inputEl.selectionEnd === raw.length;
+  inputEl.value = formatPhoneDigits(digits);
   if (cursorAtEnd) {
-    fields.phone.selectionStart = fields.phone.selectionEnd = fields.phone.value.length;
+    inputEl.selectionStart = inputEl.selectionEnd = inputEl.value.length;
   }
   render();
 }
@@ -331,8 +331,7 @@ function validate() {
     ['region', fields.region.value.trim() !== ''],
     ['name', fields.fullName.value.trim() !== ''],
     ['title', fields.jobTitle.value.trim() !== ''],
-    ['duty', fields.dutyStation.value.trim() !== ''],
-    ['phone', phoneValid(fields.phone.value)],
+    ['office-phone', phoneValid(fields.officePhone.value)],
     ['agency', emailValid(fields.agencyEmail.value.trim())],
   ];
 
@@ -344,6 +343,10 @@ function validate() {
     if (!valid) ok = false;
   });
 
+  const mobileVal = fields.mobilePhone.value.trim();
+  const mobileOk = mobileVal === '' || phoneValid(mobileVal);
+  if (!mobileOk) ok = false;
+
   const firenetVal = fields.firenetEmail.value.trim();
   const firenetOk = firenetVal === '' || emailValid(firenetVal);
   if (!firenetOk) ok = false;
@@ -352,8 +355,6 @@ function validate() {
   copyBtn.disabled = !ok;
   return ok;
 }
-
-const MAX_TEXT_X = 1648; // right edge of the divider / text safe zone
 
 function fitFontSize(text, fontBuilder, baseSize, maxWidth, minSize) {
   let size = baseSize;
@@ -387,98 +388,103 @@ function drawTextSegments(segments, x, y) {
   return cursorX;
 }
 
+const LINE_PITCH = 34;
+const TEXT_START_Y = 54;
+const TEXT_X = 230;
+const RIGHT_MARGIN = 30;
+
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Logo
+  // Logo — fixed height, vertically centered, independent of how many text lines are present
   if (logoLoaded) {
-    const targetH = 340;
+    const targetH = 280;
     const scale = targetH / logo.height;
     const targetW = logo.width * scale;
-    const zoneW = 390;
+    const zoneW = 210;
     const xOff = (zoneW - targetW) / 2;
     const yOff = (canvas.height - targetH) / 2;
     ctx.drawImage(logo, xOff, yOff, targetW, targetH);
   }
 
-  const textX = 408;
-  const darkColor = '#1a1a1a';
-  const grayColor = '#333333';
+  const blackColor = '#000000';
   const tealColor = '#467886';
+  const regularFont = 'Calibri, "Segoe UI", Arial, Helvetica, sans-serif';
 
   const name = fields.fullName.value.trim() || 'Full Name';
   const region = fields.region.value || 'Geographic Area';
   const title = fields.jobTitle.value.trim() || 'Job Title';
-  const duty = fields.dutyStation.value.trim() || 'Duty Station';
-  const phone = fields.phone.value.trim() || 'Phone Number';
+  const officePhone = fields.officePhone.value.trim() || 'Office Phone';
+  const mobilePhone = fields.mobilePhone.value.trim();
   const agencyEmail = fields.agencyEmail.value.trim() || 'agency@email.gov';
   const firenetEmail = fields.firenetEmail.value.trim();
 
-  const maxWidth = MAX_TEXT_X - textX;
-
-  // Name
-  ctx.fillStyle = darkColor;
-  const nameFontOf = (s) => `bold ${s}px Arial, Helvetica, sans-serif`;
-  const nameSize = fitFontSize(name, nameFontOf, 56, maxWidth, 24);
-  ctx.font = nameFontOf(nameSize);
+  const maxWidth = canvas.width - TEXT_X - RIGHT_MARGIN;
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText(name, textX, 64);
 
-  // Subtitle
-  const subtitleText = 'U.S. Wildland Fire Service – ' + region;
-  const subtitleFontOf = (s) => `italic bold ${s}px Arial, Helvetica, sans-serif`;
-  const subtitleSize = fitFontSize(subtitleText, subtitleFontOf, 50, maxWidth, 20);
-  ctx.font = subtitleFontOf(subtitleSize);
-  ctx.fillText(subtitleText, textX, 133);
+  let y = TEXT_START_Y;
 
-  // Title
-  const titleFontOf = (s) => `${s}px Arial, Helvetica, sans-serif`;
-  const titleSize = fitFontSize(title, titleFontOf, 44, maxWidth, 18);
-  ctx.font = titleFontOf(titleSize);
-  ctx.fillText(title, textX, 185);
+  // Name (bold, larger)
+  ctx.fillStyle = blackColor;
+  const nameFontOf = (s) => `bold ${s}px ${regularFont}`;
+  const nameSize = fitFontSize(name, nameFontOf, 26, maxWidth, 14);
+  ctx.font = nameFontOf(nameSize);
+  ctx.fillText(name, TEXT_X, y);
+  y += LINE_PITCH;
 
-  // Divider
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(405, 212, 1648 - 405, 5);
-
-  // Duty station
-  ctx.fillStyle = grayColor;
-  const dutyText = 'Duty Station:  ' + duty;
-  const dutyFontOf = (s) => `${s}px Arial, Helvetica, sans-serif`;
-  const dutySize = fitFontSize(dutyText, dutyFontOf, 44, maxWidth, 18);
-  ctx.font = dutyFontOf(dutySize);
-  ctx.fillText(dutyText, textX, 272);
-
-  // Contact line — size once against the full combined string, then draw as colored segments
-  const contactFontOf = (s) => `${s}px Arial, Helvetica, sans-serif`;
-  let fullContact = phone + '  |  ' + agencyEmail;
-  if (firenetEmail) fullContact += '   |   ' + firenetEmail;
-  const contactSize = fitFontSize(fullContact, contactFontOf, 44, maxWidth, 16);
-  const contactFont = contactFontOf(contactSize);
-
-  let segs = [
-    { text: phone + '  |  ', font: contactFont, color: grayColor, underline: false },
-    { text: agencyEmail, font: contactFont, color: tealColor, underline: true },
-  ];
-  if (firenetEmail) {
-    segs.push({ text: '   |   ', font: contactFont, color: grayColor, underline: false });
-    segs.push({ text: firenetEmail, font: contactFont, color: tealColor, underline: true });
+  // Simple plain text lines, drawn in sequence
+  const plainFontOf = (s) => `${s}px ${regularFont}`;
+  function drawPlainLine(text) {
+    const size = fitFontSize(text, plainFontOf, 20, maxWidth, 12);
+    ctx.font = plainFontOf(size);
+    ctx.fillStyle = blackColor;
+    ctx.fillText(text, TEXT_X, y);
+    y += LINE_PITCH;
   }
-  drawTextSegments(segs, textX, 321);
+
+  drawPlainLine(title);
+  drawPlainLine('U.S. Wildland Fire Service');
+  drawPlainLine(region);
+  drawPlainLine('U.S. Department of the Interior');
+
+  // Office / Mobile phone line
+  let phoneLine = 'Office: ' + officePhone;
+  if (mobilePhone) phoneLine += '  |  Mobile: ' + mobilePhone;
+  drawPlainLine(phoneLine);
+
+  // Email line(s) — label in black, address in teal + underlined
+  function drawEmailLine(label, email) {
+    const fullText = label + ' ' + email;
+    const size = fitFontSize(fullText, plainFontOf, 20, maxWidth, 12);
+    const font = plainFontOf(size);
+    const segs = [
+      { text: label + ' ', font, color: blackColor, underline: false },
+      { text: email, font, color: tealColor, underline: true },
+    ];
+    drawTextSegments(segs, TEXT_X, y);
+    y += LINE_PITCH;
+  }
+
+  drawEmailLine('Email:', agencyEmail);
+  if (firenetEmail) {
+    drawEmailLine('FireNet:', firenetEmail);
+  }
 
   validate();
 }
 
 Object.entries(fields).forEach(([key, el]) => {
-  if (key === 'phone') return; // phone gets its own formatting handler below
+  if (key === 'officePhone' || key === 'mobilePhone') return; // phone fields get their own formatting handler below
   el.addEventListener('input', render);
   el.addEventListener('change', render);
 });
 
-fields.phone.addEventListener('input', handlePhoneInput);
-fields.phone.addEventListener('change', handlePhoneInput);
+fields.officePhone.addEventListener('input', () => handlePhoneInput(fields.officePhone));
+fields.officePhone.addEventListener('change', () => handlePhoneInput(fields.officePhone));
+fields.mobilePhone.addEventListener('input', () => handlePhoneInput(fields.mobilePhone));
+fields.mobilePhone.addEventListener('change', () => handlePhoneInput(fields.mobilePhone));
 
 downloadBtn.addEventListener('click', () => {
   if (!validate()) return;
